@@ -2,7 +2,7 @@
  * Filename: task-tools.ts
  * Last Modified: 2026-03-15
  * Summary: MCP tool handlers for Vikunja task operations
- * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-11)
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-10, SI-11)
  * Classification: UNCLASSIFIED
  */
 
@@ -11,24 +11,25 @@ import { z } from 'zod';
 import type { VikunjaClient } from '../client.js';
 import type { VikunjaTask } from '../types.js';
 import { VikunjaError } from '../errors.js';
+import { positiveId, nonEmptyString, hexColor, isoDatetime, priority, page, perPage, orderBy } from '../schemas.js';
 
 function formatTask(t: VikunjaTask): string {
   const status = t.done ? '[x]' : '[ ]';
-  const priority = t.priority > 0 ? ` P${t.priority}` : '';
+  const pri = t.priority > 0 ? ` P${t.priority}` : '';
   const due = t.due_date && !t.due_date.startsWith('0001') ? ` due:${t.due_date.split('T')[0]}` : '';
   const labels = t.labels?.length ? ` [${t.labels.map(l => l.title).join(', ')}]` : '';
-  return `${status} #${t.id} ${t.title}${priority}${due}${labels}`;
+  return `${status} #${t.id} ${t.title}${pri}${due}${labels}`;
 }
 
 export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_list_tasks', {
     description: 'List all tasks across all projects. Supports search and filtering.',
     inputSchema: {
-      page: z.number().optional().describe('Page number (default: 1)'),
-      per_page: z.number().optional().describe('Tasks per page (default: 50)'),
+      page: page.optional().describe('Page number (default: 1)'),
+      per_page: perPage.optional().describe('Tasks per page (default: 50, max: 200)'),
       s: z.string().optional().describe('Search query string'),
       sort_by: z.string().optional().describe('Sort field (e.g., "due_date", "created", "priority")'),
-      order_by: z.string().optional().describe('Sort order: "asc" or "desc"'),
+      order_by: orderBy.optional().describe('Sort order: "asc" or "desc"'),
       filter: z.string().optional().describe('Vikunja filter string (e.g., "done = false")'),
     },
   }, async (params) => {
@@ -44,9 +45,9 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_list_project_tasks', {
     description: 'List tasks within a specific project',
     inputSchema: {
-      project_id: z.number().describe('Project ID'),
-      page: z.number().optional().describe('Page number'),
-      per_page: z.number().optional().describe('Tasks per page'),
+      project_id: positiveId.describe('Project ID'),
+      page: page.optional().describe('Page number'),
+      per_page: perPage.optional().describe('Tasks per page (max: 200)'),
       filter: z.string().optional().describe('Vikunja filter string'),
     },
   }, async ({ project_id, ...params }) => {
@@ -66,7 +67,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_get_task', {
     description: 'Get detailed information about a specific task',
     inputSchema: {
-      id: z.number().describe('Task ID'),
+      id: positiveId.describe('Task ID'),
     },
   }, async ({ id }) => {
     const task = await client.getTask(id);
@@ -78,13 +79,13 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_create_task', {
     description: 'Create a new task in a project',
     inputSchema: {
-      project_id: z.number().describe('Project ID to create the task in'),
-      title: z.string().describe('Task title'),
+      project_id: positiveId.describe('Project ID to create the task in'),
+      title: nonEmptyString.describe('Task title'),
       description: z.string().optional().describe('Task description (supports markdown)'),
       done: z.boolean().optional().describe('Mark as completed'),
-      priority: z.number().optional().describe('Priority: 0=none, 1=low, 2=medium, 3=high, 4=urgent'),
-      due_date: z.string().optional().describe('Due date in ISO format (e.g., "2026-03-15T00:00:00Z")'),
-      hex_color: z.string().optional().describe('Hex color code'),
+      priority: priority.optional().describe('Priority: 0=none, 1=low, 2=medium, 3=high, 4=urgent'),
+      due_date: isoDatetime.optional().describe('Due date in ISO format (e.g., "2026-03-15T00:00:00Z")'),
+      hex_color: hexColor.optional().describe('Hex color code (e.g., "#ff0000")'),
     },
   }, async ({ project_id, ...data }) => {
     const task = await client.createTask(project_id, data);
@@ -96,13 +97,13 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_update_task', {
     description: 'Update an existing task',
     inputSchema: {
-      id: z.number().describe('Task ID'),
-      title: z.string().optional().describe('New title'),
+      id: positiveId.describe('Task ID'),
+      title: nonEmptyString.optional().describe('New title'),
       description: z.string().optional().describe('New description'),
       done: z.boolean().optional().describe('Mark as done/undone'),
-      priority: z.number().optional().describe('Priority: 0=none, 1=low, 2=medium, 3=high, 4=urgent'),
-      due_date: z.string().optional().describe('Due date in ISO format'),
-      hex_color: z.string().optional().describe('Hex color code'),
+      priority: priority.optional().describe('Priority: 0=none, 1=low, 2=medium, 3=high, 4=urgent'),
+      due_date: isoDatetime.optional().describe('Due date in ISO format'),
+      hex_color: hexColor.optional().describe('Hex color code (e.g., "#ff0000")'),
     },
   }, async ({ id, ...data }) => {
     const task = await client.updateTask(id, data);
@@ -114,7 +115,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_complete_task', {
     description: 'Mark a task as completed',
     inputSchema: {
-      id: z.number().describe('Task ID to complete'),
+      id: positiveId.describe('Task ID to complete'),
     },
   }, async ({ id }) => {
     const task = await client.updateTask(id, { done: true });
@@ -126,7 +127,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_delete_task', {
     description: 'Delete a task',
     inputSchema: {
-      id: z.number().describe('Task ID to delete'),
+      id: positiveId.describe('Task ID to delete'),
     },
   }, async ({ id }) => {
     await client.deleteTask(id);
@@ -138,14 +139,14 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_bulk_create_tasks', {
     description: 'Create multiple tasks at once in a project',
     inputSchema: {
-      project_id: z.number().describe('Project ID to create tasks in'),
+      project_id: positiveId.describe('Project ID to create tasks in'),
       tasks: z.array(z.object({
-        title: z.string().describe('Task title'),
+        title: nonEmptyString.describe('Task title'),
         description: z.string().optional().describe('Task description'),
         done: z.boolean().optional().describe('Mark as completed'),
-        priority: z.number().optional().describe('Priority (0-4)'),
-        due_date: z.string().optional().describe('Due date in ISO format'),
-      })).describe('Array of tasks to create'),
+        priority: priority.optional().describe('Priority (0-4)'),
+        due_date: isoDatetime.optional().describe('Due date in ISO format'),
+      })).min(1).max(50).describe('Array of tasks to create (1-50)'),
     },
   }, async ({ project_id, tasks }) => {
     const succeeded: string[] = [];
