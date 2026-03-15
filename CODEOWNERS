@@ -1,0 +1,16 @@
+# Filename: CODEOWNERS
+# Last Modified: 2026-03-15
+# Summary: Code ownership for review requirements
+# Compliant With: DoD STIG, NIST SP800-53 Rev 5 (CM-5)
+# Classification: UNCLASSIFIED
+
+# Default owner for all files
+* @darkhonor
+
+# Security-critical files require owner review
+SECURITY.md @darkhonor
+src/client.ts @darkhonor
+src/errors.ts @darkhonor
+src/rate-limiter.ts @darkhonor
+src/logger.ts @darkhonor
+.github/workflows/ @darkhonor

@@ -1,3 +1,11 @@
+/**
+ * Filename: index.ts
+ * Last Modified: 2026-03-15
+ * Summary: MCP server entry point — initializes Vikunja client and stdio transport
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5
+ * Classification: UNCLASSIFIED
+ */
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { VikunjaClient } from './client.js';

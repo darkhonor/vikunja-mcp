@@ -1,3 +1,11 @@
+/**
+ * Filename: types.ts
+ * Last Modified: 2026-03-15
+ * Summary: TypeScript interfaces for Vikunja REST API response models
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5
+ * Classification: UNCLASSIFIED
+ */
+
 export interface VikunjaProject {
   id: number;
   title: string;
