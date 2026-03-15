@@ -1,6 +1,15 @@
+/**
+ * Filename: project-tools.ts
+ * Last Modified: 2026-03-15
+ * Summary: MCP tool handlers for Vikunja project operations
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-10)
+ * Classification: UNCLASSIFIED
+ */
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { VikunjaClient } from '../client.js';
+import { positiveId, nonEmptyString, hexColor } from '../schemas.js';
+import { z } from 'zod';
 
 export function projectTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_list_projects', {
@@ -21,10 +30,10 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_create_project', {
     description: 'Create a new project in Vikunja',
     inputSchema: {
-      title: z.string().describe('Project title'),
+      title: nonEmptyString.describe('Project title'),
       description: z.string().optional().describe('Project description'),
-      parent_project_id: z.number().optional().describe('Parent project ID for nesting'),
-      hex_color: z.string().optional().describe('Hex color code (e.g., "#ff0000")'),
+      parent_project_id: positiveId.optional().describe('Parent project ID for nesting'),
+      hex_color: hexColor.optional().describe('Hex color code (e.g., "#ff0000")'),
     },
   }, async ({ title, description, parent_project_id, hex_color }) => {
     const project = await client.createProject({ title, description, parent_project_id, hex_color });
@@ -36,11 +45,11 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_update_project', {
     description: 'Update an existing project in Vikunja',
     inputSchema: {
-      id: z.number().describe('Project ID'),
-      title: z.string().optional().describe('New title'),
+      id: positiveId.describe('Project ID'),
+      title: nonEmptyString.optional().describe('New title'),
       description: z.string().optional().describe('New description'),
       is_archived: z.boolean().optional().describe('Archive or unarchive the project'),
-      hex_color: z.string().optional().describe('Hex color code'),
+      hex_color: hexColor.optional().describe('Hex color code (e.g., "#ff0000")'),
     },
   }, async ({ id, ...data }) => {
     const project = await client.updateProject(id, data);
@@ -52,7 +61,7 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_delete_project', {
     description: 'Delete a project and all its tasks in Vikunja',
     inputSchema: {
-      id: z.number().describe('Project ID to delete'),
+      id: positiveId.describe('Project ID to delete'),
     },
   }, async ({ id }) => {
     await client.deleteProject(id);
