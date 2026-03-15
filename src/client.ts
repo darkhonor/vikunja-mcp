@@ -1,14 +1,15 @@
 /**
  * Filename: client.ts
  * Last Modified: 2026-03-15
- * Summary: Vikunja REST API client with typed errors, transport security, and secure credentials
- * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SC-8, SC-13, SC-28, IA-5, SI-11)
+ * Summary: Vikunja REST API client with typed errors, transport security, secure credentials, and rate limiting
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SC-5, SC-8, SC-13, SC-28, IA-5, SI-11)
  * Classification: UNCLASSIFIED
  */
 
 import { readFileSync, statSync } from 'node:fs';
 import type { VikunjaProject, VikunjaTask, VikunjaLabel, VikunjaView } from './types.js';
 import { ConfigurationError, createApiError } from './errors.js';
+import { RateLimiter, fetchWithRetry } from './rate-limiter.js';
 
 /**
  * Resolve the API token from environment variables.
@@ -65,6 +66,7 @@ function resolveToken(): string {
 export class VikunjaClient {
   private baseUrl: string;
   private token: string;
+  private limiter: RateLimiter;
 
   constructor() {
     const url = process.env.VIKUNJA_URL;
@@ -94,6 +96,7 @@ export class VikunjaClient {
 
     this.baseUrl = url.replace(/\/$/, '') + '/api/v1';
     this.token = token;
+    this.limiter = new RateLimiter();
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -103,7 +106,7 @@ export class VikunjaClient {
       'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(this.limiter, url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
