@@ -13,57 +13,7 @@
 > implementation belongs to Jordan. This fork applies security hardening
 > for use in DoD and enterprise environments.
 
-## Hardening Overview
-
-This fork applies DoD STIG and NIST SP800-53 Rev 5 security controls to make the MCP suitable for deployment in security-conscious environments. The following hardening measures are planned or implemented:
-
-### Transport Security (NIST SC-8, SC-13)
-
-- **HTTPS Enforcement** — Reject plaintext `http://` URLs for the Vikunja API endpoint
-- **Custom CA Certificate Support** — Load trusted CA bundles for environments using private PKI (e.g., DoD PKI, internal CAs)
-- **TLS 1.2+ Requirement** — Enforce minimum TLS version for all API communication
-
-### Credential Protection (NIST SC-28, IA-5)
-
-- **Secrets Management Integration** — Support for loading API tokens from file-based secrets, environment variable indirection, or HashiCorp Vault
-- **Configuration Hardening** — Guidance and tooling for secure token storage with appropriate file permissions
-- **No Plaintext Tokens in Config** — Deprecate direct token embedding in `~/.claude.json`
-
-### Audit & Accountability (NIST AU-2, AU-3)
-
-- **Operation Logging** — Structured audit log of all create, update, and delete operations
-- **Log Format** — Timestamp (UTC), operation type, resource ID, success/failure status
-- **Log Integrity** — Configurable log output for integration with centralized log management
-
-### Error Handling & Information Protection (NIST SI-11)
-
-- **Sanitized Error Messages** — Strip raw API responses from error output to prevent information disclosure
-- **Typed Error Handling** — Custom error classes for authentication failures, rate limits, validation errors, and server errors
-- **Partial Failure Reporting** — Bulk operations report per-item success/failure instead of silent partial completion
-
-### Input Validation (NIST SI-10)
-
-- **Extended Schema Validation** — Validate color hex codes, date formats (ISO 8601), ID ranges, and URL formats beyond base Zod schemas
-- **Response Validation** — Validate API responses to detect unexpected data from the server
-- **URL Sanitization** — Prevent SSRF by validating the Vikunja URL against an allowlist or pattern
-
-### Availability & Resilience (NIST SC-5)
-
-- **Rate Limiting** — Configurable per-operation rate limits to prevent resource exhaustion
-- **Bulk Operation Throttling** — Sequential batch operations with configurable concurrency limits
-- **Retry with Exponential Backoff** — Automatic retry for transient failures (429, 503) with jitter
-
-### Testing & Quality (NIST CM-5, SI-6)
-
-- **Unit Test Suite** — Tests for client methods, input validation, and error handling
-- **Integration Tests** — Mock Vikunja API tests for end-to-end tool verification
-- **CI/CD Pipeline** — Automated build, test, lint, and security scanning
-
-### Documentation & Compliance
-
-- **Security Documentation** — Threat model, configuration hardening guide, and vulnerability disclosure process
-- **Compliance Headers** — All source files include DoD STIG/NIST compliance headers
-- **SBOM Generation** — Software Bill of Materials for supply chain transparency (NIST SR-4)
+A [Model Context Protocol](https://modelcontextprotocol.io/) server that connects AI assistants to [Vikunja](https://vikunja.io) task management. 16 tools for managing projects, tasks, and labels — hardened for DoD and enterprise deployment.
 
 ## Setup
 
@@ -72,9 +22,11 @@ This fork applies DoD STIG and NIST SP800-53 Rev 5 security controls to make the
 | Variable | Required | Description |
 | -------- | -------- | ----------- |
 | `VIKUNJA_URL` | Yes | Your Vikunja instance URL (**HTTPS required**) |
-| `VIKUNJA_API_TOKEN` | Yes | API token from Vikunja Settings > API Tokens |
+| `VIKUNJA_API_TOKEN_FILE` | Preferred | Path to file containing API token (Docker/K8s secrets compatible) |
+| `VIKUNJA_API_TOKEN` | Fallback | Direct API token value |
+| `VIKUNJA_LOG_LEVEL` | No | Logging verbosity: `error`, `warn`, `info` (default), `debug` |
+| `VIKUNJA_RATE_LIMIT` | No | Max requests per minute (default: 30) |
 | `NODE_EXTRA_CA_CERTS` | No | Path to custom CA certificate bundle for private PKI |
-| `VIKUNJA_LOG_LEVEL` | No | Logging verbosity: `error`, `warn`, `info`, `debug` (default: `info`) |
 
 ### Claude Code Configuration
 
@@ -88,12 +40,31 @@ Add to `~/.claude.json`:
       "args": ["/path/to/vikunja-mcp/dist/index.js"],
       "env": {
         "VIKUNJA_URL": "https://vikunja.example.com",
-        "VIKUNJA_API_TOKEN": "tk_your_token_here",
+        "VIKUNJA_API_TOKEN_FILE": "/run/secrets/vikunja-token",
         "NODE_EXTRA_CA_CERTS": "/path/to/ca-chain.crt"
       }
     }
   }
 }
+```
+
+### Docker / Kubernetes Secrets
+
+The preferred credential pattern uses `VIKUNJA_API_TOKEN_FILE` pointing to a
+mounted secret. The server validates file permissions and warns if the token
+file is world-readable.
+
+```yaml
+# Kubernetes example
+env:
+  - name: VIKUNJA_URL
+    value: "https://vikunja.example.com"
+  - name: VIKUNJA_API_TOKEN_FILE
+    value: "/run/secrets/vikunja/token"
+volumeMounts:
+  - name: vikunja-secret
+    mountPath: /run/secrets/vikunja
+    readOnly: true
 ```
 
 ## Tools (16)
@@ -112,7 +83,7 @@ Add to `~/.claude.json`:
 - **vikunja_update_task** — Update task fields
 - **vikunja_complete_task** — Mark a task as done
 - **vikunja_delete_task** — Delete a task
-- **vikunja_bulk_create_tasks** — Create multiple tasks at once
+- **vikunja_bulk_create_tasks** — Create multiple tasks at once (1-50, rate-limited)
 
 ### Labels
 - **vikunja_list_labels** — List all labels
@@ -125,8 +96,10 @@ Add to `~/.claude.json`:
 ```bash
 git clone https://github.com/darkhonor/vikunja-mcp.git
 cd vikunja-mcp
+nvm use           # Uses .nvmrc (Node 22)
 npm install
 npm run build
+npm test          # 81 tests across 5 modules
 ```
 
 ## API Notes
@@ -137,6 +110,63 @@ This MCP wraps the [Vikunja REST API v1](https://vikunja.io/docs/api/). A few qu
 - Listing tasks in a project requires a View ID — the MCP handles this automatically by fetching the first view
 - Dates use ISO 8601 format: `2026-03-15T00:00:00Z`
 - API tokens can be created in Vikunja under Settings > API Tokens
+
+## Security & Compliance
+
+This fork implements the following DoD STIG and NIST SP800-53 Rev 5 security controls:
+
+### Transport Security (SC-8, SC-13)
+
+- HTTPS enforced at startup — plaintext `http://` URLs are rejected
+- Custom CA support via `NODE_EXTRA_CA_CERTS` for private PKI (DoD PKI, internal CAs)
+
+### Credential Protection (SC-28, IA-5)
+
+- File-based token loading via `VIKUNJA_API_TOKEN_FILE` (Docker/K8s secrets compatible)
+- Token file permission validation — warns on world-readable files
+- Tokens never appear in logs or error messages
+
+### Audit Logging (AU-2, AU-3)
+
+- Structured JSON audit entries written to stderr (MCP convention)
+- Mutating operations (create/update/delete) logged at `info` level
+- Read operations logged at `debug` level for low-noise production use
+- Configurable via `VIKUNJA_LOG_LEVEL` environment variable
+- Fields: timestamp (ISO 8601), level, operation, resource, resourceId, status, error
+
+### Error Handling (SI-11)
+
+- Typed error hierarchy: `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ValidationError`, `RateLimitError`, `ServerError`
+- Raw API response bodies stored privately for debug — never surfaced to MCP output
+- Bulk operations report per-item success/failure for forensic traceability
+
+### Input Validation (SI-10)
+
+- Zod schemas enforce whitelist validation on all tool inputs
+- Validated types: positive IDs, hex color codes (`#RRGGBB`), ISO 8601 datetimes, priority (0-4), pagination bounds (1-200), sort order
+- Bulk create bounded to 1-50 tasks per call
+
+### Rate Limiting & Resilience (SC-5)
+
+- Token-bucket rate limiter — configurable via `VIKUNJA_RATE_LIMIT` (default: 30 req/min)
+- Automatic retry on 429 (Too Many Requests) and 503 (Service Unavailable)
+- Exponential backoff with jitter: base 1s, max 30s, up to 3 retries
+- Respects `Retry-After` header from Vikunja
+
+### Testing & CI/CD (CM-5, SI-6, SA-11)
+
+- 81 unit tests across 5 modules (Vitest)
+- CI pipeline: build, lint, test on Node 20 and 22
+- npm audit on every build (critical threshold)
+- CycloneDX SBOM generated on each release (SR-4)
+- Dependabot for weekly dependency monitoring
+- Branch protection with required reviews
+
+### Documentation & Compliance (PL-2)
+
+- All source files carry DoD STIG/NIST SP800-53 compliance headers
+- SECURITY.md with vulnerability disclosure process
+- CODEOWNERS for review enforcement on security-critical files
 
 ## License
 
