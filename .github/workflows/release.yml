@@ -1,0 +1,66 @@
+# Filename: release.yml
+# Last Modified: 2026-03-15
+# Summary: CD pipeline for release builds with SBOM generation
+# Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SR-4, SA-11)
+# Classification: UNCLASSIFIED
+###############################################################################
+# Release Pipeline
+#
+# Runs on version tags (v*) to build, generate SBOM, and create a
+# GitHub Release with artifacts attached.
+#
+# Security Controls:
+#   - SR-4: Supply chain provenance via CycloneDX SBOM
+#   - SA-11: Build validation before release
+###############################################################################
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run lint
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify bundle exists
+        run: test -f dist/index.js
+
+      - name: Run npm audit
+        run: npm audit --audit-level=critical
+
+      - name: Generate CycloneDX SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format JSON
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/index.js
+            sbom.json

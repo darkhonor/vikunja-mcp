@@ -1,0 +1,105 @@
+# Filename: ci.yml
+# Last Modified: 2026-03-15
+# Summary: CI pipeline for build validation, linting, testing, and security scanning
+# Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SA-11, RA-5, CM-5)
+# Classification: UNCLASSIFIED
+###############################################################################
+# CI Pipeline
+#
+# Runs on every push and pull request to validate code quality and security.
+#
+# Security Controls:
+#   - SA-11: Developer testing and evaluation (build, lint, test)
+#   - RA-5: Vulnerability monitoring (npm audit)
+#   - CM-5: Access restrictions for change (required status check)
+###############################################################################
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Lint (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run lint
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify bundle exists
+        run: test -f dist/index.js
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=critical
+        continue-on-error: false
+
+  # Placeholder for when test suite is implemented (Issue #7)
+  # test:
+  #   name: Test (Node ${{ matrix.node-version }})
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       node-version: [20, 22]
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Node.js ${{ matrix.node-version }}
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ matrix.node-version }}
+  #         cache: npm
+  #
+  #     - name: Install dependencies
+  #       run: npm ci
+  #
+  #     - name: Run tests with coverage
+  #       run: npm test -- --coverage
+  #
+  #     - name: Upload coverage report
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: coverage-node-${{ matrix.node-version }}
+  #         path: coverage/
