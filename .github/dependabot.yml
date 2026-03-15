@@ -1,0 +1,45 @@
+# Filename: dependabot.yml
+# Last Modified: 2026-03-15
+# Summary: Dependabot configuration for automated dependency updates
+# Compliant With: DoD STIG, NIST SP800-53 Rev 5 (RA-5, SI-2, SR-4)
+# Classification: UNCLASSIFIED
+###############################################################################
+# Dependabot Dependency Updates
+#
+# Monitors npm and GitHub Actions ecosystems for outdated or vulnerable
+# dependencies. Groups minor/patch updates to reduce PR noise while
+# keeping major bumps separate for manual review.
+#
+# Security Controls:
+#   - RA-5: Vulnerability monitoring and scanning
+#   - SI-2: Flaw remediation within DoD 30-day critical patch window
+#   - SR-4: Supply chain provenance via dependency tracking
+###############################################################################
+---
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    reviewers:
+      - "darkhonor"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    reviewers:
+      - "darkhonor"
+    commit-message:
+      prefix: "ci"
