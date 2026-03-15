@@ -12,6 +12,7 @@ import type { VikunjaClient } from '../client.js';
 import type { VikunjaTask } from '../types.js';
 import { VikunjaError } from '../errors.js';
 import { positiveId, nonEmptyString, hexColor, isoDatetime, priority, page, perPage, orderBy } from '../schemas.js';
+import { logger } from '../logger.js';
 
 function formatTask(t: VikunjaTask): string {
   const status = t.done ? '[x]' : '[ ]';
@@ -34,6 +35,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async (params) => {
     const tasks = await client.listTasks(params);
+    logger.read('list_tasks', 'task', `${tasks.length} task(s)`);
     if (!tasks.length) return { content: [{ type: 'text', text: 'No tasks found.' }] };
 
     const lines = tasks.map(formatTask).join('\n');
@@ -56,6 +58,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     if (!views.length) return { content: [{ type: 'text', text: 'Project has no views.' }] };
 
     const tasks = await client.listProjectTasks(project_id, views[0].id, params);
+    logger.read('list_project_tasks', 'task', `${tasks.length} task(s) in project #${project_id}`);
     if (!tasks.length) return { content: [{ type: 'text', text: 'No tasks in this project.' }] };
 
     const lines = tasks.map(formatTask).join('\n');
@@ -71,6 +74,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id }) => {
     const task = await client.getTask(id);
+    logger.read('get_task', 'task', `task #${id}`);
     return {
       content: [{ type: 'text', text: JSON.stringify(task, null, 2) }],
     };
@@ -89,6 +93,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ project_id, ...data }) => {
     const task = await client.createTask(project_id, data);
+    logger.success('create_task', 'task', task.id, project_id);
     return {
       content: [{ type: 'text', text: `Created task [${task.id}] "${task.title}" in project #${project_id}` }],
     };
@@ -107,6 +112,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id, ...data }) => {
     const task = await client.updateTask(id, data);
+    logger.success('update_task', 'task', task.id);
     return {
       content: [{ type: 'text', text: `Updated task [${task.id}] "${task.title}"` }],
     };
@@ -119,6 +125,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id }) => {
     const task = await client.updateTask(id, { done: true });
+    logger.success('complete_task', 'task', task.id);
     return {
       content: [{ type: 'text', text: `Completed task [${task.id}] "${task.title}"` }],
     };
@@ -131,6 +138,7 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id }) => {
     await client.deleteTask(id);
+    logger.success('delete_task', 'task', id);
     return {
       content: [{ type: 'text', text: `Deleted task #${id}` }],
     };
@@ -155,9 +163,11 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
     for (const taskData of tasks) {
       try {
         const task = await client.createTask(project_id, taskData);
+        logger.success('bulk_create_task', 'task', task.id, project_id);
         succeeded.push(`  [${task.id}] ${task.title}`);
       } catch (err) {
         const reason = err instanceof VikunjaError ? err.message : 'Unknown error';
+        logger.failure('bulk_create_task', 'task', reason);
         failed.push(`  "${taskData.title}": ${reason}`);
       }
     }
