@@ -1,3 +1,11 @@
+/**
+ * Filename: build.mjs
+ * Last Modified: 2026-03-15
+ * Summary: esbuild configuration for bundling MCP server
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SA-11)
+ * Classification: UNCLASSIFIED
+ */
+
 import { build } from 'esbuild';
 
 await build({
