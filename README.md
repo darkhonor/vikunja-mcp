@@ -6,11 +6,12 @@
 
 # vikunja-mcp (Hardened)
 
-A security-hardened fork of [jrejaud/vikunja-mcp](https://github.com/jrejaud/vikunja-mcp) — an MCP server for [Vikunja](https://vikunja.io), the open-source task management app. Provides 16 tools for managing projects, tasks, and labels through Claude Code or any MCP-compatible client.
-
-## Credit
-
-This project is a fork of the original work by **Jordan Rejaud** ([jrejaud](https://github.com/jrejaud)). The upstream project provides a clean, functional MCP implementation with excellent architectural decisions — minimal dependencies, strict TypeScript, and Zod-based input validation. This fork builds on that solid foundation with enterprise-grade security hardening.
+> **This is a fork of [jrejaud/vikunja-mcp](https://github.com/jrejaud/vikunja-mcp) by [Jordan Rejaud](https://github.com/jrejaud).**
+> The original project is an excellent, cleanly architected MCP server for
+> [Vikunja](https://vikunja.io) with minimal dependencies, strict TypeScript,
+> and Zod-based input validation. All credit for the original design and
+> implementation belongs to Jordan. This fork applies security hardening
+> for use in DoD and enterprise environments.
 
 ## Hardening Overview
 
