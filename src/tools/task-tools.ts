@@ -1,7 +1,16 @@
+/**
+ * Filename: task-tools.ts
+ * Last Modified: 2026-03-15
+ * Summary: MCP tool handlers for Vikunja task operations
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-11)
+ * Classification: UNCLASSIFIED
+ */
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { VikunjaClient } from '../client.js';
 import type { VikunjaTask } from '../types.js';
+import { VikunjaError } from '../errors.js';
 
 function formatTask(t: VikunjaTask): string {
   const status = t.done ? '[x]' : '[ ]';
@@ -139,13 +148,29 @@ export function taskTools(server: McpServer, client: VikunjaClient): void {
       })).describe('Array of tasks to create'),
     },
   }, async ({ project_id, tasks }) => {
-    const results: string[] = [];
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+
     for (const taskData of tasks) {
-      const task = await client.createTask(project_id, taskData);
-      results.push(`[${task.id}] ${task.title}`);
+      try {
+        const task = await client.createTask(project_id, taskData);
+        succeeded.push(`  [${task.id}] ${task.title}`);
+      } catch (err) {
+        const reason = err instanceof VikunjaError ? err.message : 'Unknown error';
+        failed.push(`  "${taskData.title}": ${reason}`);
+      }
     }
+
+    const lines: string[] = [];
+    if (succeeded.length) {
+      lines.push(`Created ${succeeded.length} task(s):`, ...succeeded);
+    }
+    if (failed.length) {
+      lines.push(`Failed ${failed.length} task(s):`, ...failed);
+    }
+
     return {
-      content: [{ type: 'text', text: `Created ${results.length} task(s) in project #${project_id}:\n${results.join('\n')}` }],
+      content: [{ type: 'text', text: lines.join('\n') }],
     };
   });
 }
