@@ -7,7 +7,7 @@
  */
 
 import { logger } from './logger.js';
-import { RateLimitError } from './errors.js';
+import { createApiError } from './errors.js';
 
 /** Default configuration constants. */
 const DEFAULT_RATE_LIMIT = 30;    // requests per minute
@@ -103,11 +103,7 @@ export async function fetchWithRetry(
     }
 
     // Transient error — prepare for retry
-    lastError = new RateLimitError(
-      `HTTP ${response.status} on attempt ${attempt + 1}`,
-      response.status,
-      await response.text(),
-    );
+    lastError = createApiError(response.status, await response.text());
 
     if (attempt === MAX_RETRIES) break;
 
