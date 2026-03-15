@@ -10,12 +10,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { VikunjaClient } from '../client.js';
 import { positiveId, nonEmptyString, hexColor } from '../schemas.js';
+import { logger } from '../logger.js';
 
 export function labelTools(server: McpServer, client: VikunjaClient): void {
   server.registerTool('vikunja_list_labels', {
     description: 'List all labels the user has access to',
   }, async () => {
     const labels = await client.listLabels();
+    logger.read('list_labels', 'label', `${labels.length} label(s)`);
     if (!labels.length) return { content: [{ type: 'text', text: 'No labels found.' }] };
 
     const lines = labels.map(l => {
@@ -37,6 +39,7 @@ export function labelTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async (data) => {
     const label = await client.createLabel(data);
+    logger.success('create_label', 'label', label.id);
     return {
       content: [{ type: 'text', text: `Created label [${label.id}] "${label.title}"` }],
     };
@@ -50,6 +53,7 @@ export function labelTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ task_id, label_id }) => {
     const label = await client.addLabelToTask(task_id, label_id);
+    logger.success('add_label_to_task', 'label', label_id);
     return {
       content: [{ type: 'text', text: `Added label "${label.title}" to task #${task_id}` }],
     };
@@ -63,6 +67,7 @@ export function labelTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ task_id, label_id }) => {
     await client.removeLabelFromTask(task_id, label_id);
+    logger.success('remove_label_from_task', 'label', label_id);
     return {
       content: [{ type: 'text', text: `Removed label #${label_id} from task #${task_id}` }],
     };

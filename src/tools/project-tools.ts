@@ -9,6 +9,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { VikunjaClient } from '../client.js';
 import { positiveId, nonEmptyString, hexColor } from '../schemas.js';
+import { logger } from '../logger.js';
 import { z } from 'zod';
 
 export function projectTools(server: McpServer, client: VikunjaClient): void {
@@ -16,6 +17,7 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
     description: 'List all projects the user has access to in Vikunja',
   }, async () => {
     const projects = await client.listProjects();
+    logger.read('list_projects', 'project', `${projects.length} project(s)`);
     const summary = projects.map(p => {
       const archived = p.is_archived ? ' [ARCHIVED]' : '';
       const parent = p.parent_project_id ? ` (child of #${p.parent_project_id})` : '';
@@ -37,6 +39,7 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ title, description, parent_project_id, hex_color }) => {
     const project = await client.createProject({ title, description, parent_project_id, hex_color });
+    logger.success('create_project', 'project', project.id);
     return {
       content: [{ type: 'text', text: `Created project [${project.id}] "${project.title}"` }],
     };
@@ -53,6 +56,7 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id, ...data }) => {
     const project = await client.updateProject(id, data);
+    logger.success('update_project', 'project', project.id);
     return {
       content: [{ type: 'text', text: `Updated project [${project.id}] "${project.title}"` }],
     };
@@ -65,6 +69,7 @@ export function projectTools(server: McpServer, client: VikunjaClient): void {
     },
   }, async ({ id }) => {
     await client.deleteProject(id);
+    logger.success('delete_project', 'project', id);
     return {
       content: [{ type: 'text', text: `Deleted project #${id}` }],
     };
