@@ -1,8 +1,8 @@
 /**
  * Filename: client.ts
  * Last Modified: 2026-03-15
- * Summary: Vikunja REST API client with typed error handling
- * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-11)
+ * Summary: Vikunja REST API client with typed error handling and transport security
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SC-8, SC-13, SI-11)
  * Classification: UNCLASSIFIED
  */
 
@@ -19,6 +19,25 @@ export class VikunjaClient {
 
     if (!url) throw new ConfigurationError('VIKUNJA_URL environment variable is required');
     if (!token) throw new ConfigurationError('VIKUNJA_API_TOKEN environment variable is required');
+
+    // Validate URL format (NIST SC-8: transmission confidentiality)
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new ConfigurationError(
+        `VIKUNJA_URL is not a valid URL: "${url}". Expected format: https://vikunja.example.com`,
+      );
+    }
+
+    // Enforce HTTPS — reject plaintext HTTP to protect Bearer token in transit
+    if (parsed.protocol !== 'https:') {
+      throw new ConfigurationError(
+        `VIKUNJA_URL must use HTTPS (got "${parsed.protocol}"). ` +
+        'Plaintext HTTP would transmit your API token unencrypted. ' +
+        'For private CA environments, set NODE_EXTRA_CA_CERTS to your CA bundle path.',
+      );
+    }
 
     this.baseUrl = url.replace(/\/$/, '') + '/api/v1';
     this.token = token;
