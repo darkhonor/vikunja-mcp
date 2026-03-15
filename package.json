@@ -14,12 +14,12 @@
     "lint": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.0.14",
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.27.4",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
