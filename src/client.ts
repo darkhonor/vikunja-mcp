@@ -1,13 +1,66 @@
 /**
  * Filename: client.ts
  * Last Modified: 2026-03-15
- * Summary: Vikunja REST API client with typed error handling and transport security
- * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SC-8, SC-13, SI-11)
+ * Summary: Vikunja REST API client with typed errors, transport security, and secure credentials
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SC-8, SC-13, SC-28, IA-5, SI-11)
  * Classification: UNCLASSIFIED
  */
 
+import { readFileSync, statSync } from 'node:fs';
 import type { VikunjaProject, VikunjaTask, VikunjaLabel, VikunjaView } from './types.js';
 import { ConfigurationError, createApiError } from './errors.js';
+
+/**
+ * Resolve the API token from environment variables.
+ *
+ * Supports two patterns (NIST SC-28, IA-5):
+ *   1. VIKUNJA_API_TOKEN_FILE — path to a file containing the token
+ *      (preferred — compatible with Docker secrets, Kubernetes mounted secrets)
+ *   2. VIKUNJA_API_TOKEN — direct token value (fallback)
+ *
+ * File-based loading validates permissions and warns if too permissive.
+ */
+function resolveToken(): string {
+  const tokenFile = process.env.VIKUNJA_API_TOKEN_FILE;
+  const tokenDirect = process.env.VIKUNJA_API_TOKEN;
+
+  if (tokenFile) {
+    try {
+      const token = readFileSync(tokenFile, 'utf-8').trim();
+      if (!token) {
+        throw new ConfigurationError(`Token file is empty: ${tokenFile}`);
+      }
+
+      // Warn if file permissions are too permissive (NIST IA-5)
+      try {
+        const mode = statSync(tokenFile).mode & 0o777;
+        if (mode & 0o077) {
+          console.error(
+            `[WARN] Token file ${tokenFile} has permissive permissions (${mode.toString(8)}). ` +
+            'Recommend chmod 600 to restrict access.',
+          );
+        }
+      } catch {
+        // Permission check is best-effort — skip on unsupported platforms
+      }
+
+      return token;
+    } catch (err) {
+      if (err instanceof ConfigurationError) throw err;
+      throw new ConfigurationError(
+        `Failed to read token file "${tokenFile}": ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  if (tokenDirect) {
+    return tokenDirect;
+  }
+
+  throw new ConfigurationError(
+    'API token required. Set VIKUNJA_API_TOKEN_FILE (preferred) or VIKUNJA_API_TOKEN.',
+  );
+}
 
 export class VikunjaClient {
   private baseUrl: string;
@@ -15,10 +68,10 @@ export class VikunjaClient {
 
   constructor() {
     const url = process.env.VIKUNJA_URL;
-    const token = process.env.VIKUNJA_API_TOKEN;
 
     if (!url) throw new ConfigurationError('VIKUNJA_URL environment variable is required');
-    if (!token) throw new ConfigurationError('VIKUNJA_API_TOKEN environment variable is required');
+
+    const token = resolveToken();
 
     // Validate URL format (NIST SC-8: transmission confidentiality)
     let parsed: URL;
