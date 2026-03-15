@@ -1,4 +1,13 @@
+/**
+ * Filename: client.ts
+ * Last Modified: 2026-03-15
+ * Summary: Vikunja REST API client with typed error handling
+ * Compliant With: DoD STIG, NIST SP800-53 Rev 5 (SI-11)
+ * Classification: UNCLASSIFIED
+ */
+
 import type { VikunjaProject, VikunjaTask, VikunjaLabel, VikunjaView } from './types.js';
+import { ConfigurationError, createApiError } from './errors.js';
 
 export class VikunjaClient {
   private baseUrl: string;
@@ -8,8 +17,8 @@ export class VikunjaClient {
     const url = process.env.VIKUNJA_URL;
     const token = process.env.VIKUNJA_API_TOKEN;
 
-    if (!url) throw new Error('VIKUNJA_URL environment variable is required');
-    if (!token) throw new Error('VIKUNJA_API_TOKEN environment variable is required');
+    if (!url) throw new ConfigurationError('VIKUNJA_URL environment variable is required');
+    if (!token) throw new ConfigurationError('VIKUNJA_API_TOKEN environment variable is required');
 
     this.baseUrl = url.replace(/\/$/, '') + '/api/v1';
     this.token = token;
@@ -29,8 +38,8 @@ export class VikunjaClient {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Vikunja API error ${response.status}: ${text}`);
+      const rawBody = await response.text();
+      throw createApiError(response.status, rawBody);
     }
 
     if (response.status === 204) return {} as T;

@@ -5,3 +5,8 @@ dist/
 .env.*
 batch_migrate.sh
 migrate.sh
+
+# Claude Code working files
+.claude/
+CLAUDE.md
+.plans/
