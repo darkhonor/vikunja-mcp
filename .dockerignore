@@ -1,0 +1,34 @@
+# Filename: .dockerignore
+# Last Modified: 2026-03-16
+# Summary: Exclude unnecessary files from container build context
+# Compliant With: DoD Container STIG, NIST SP800-53 Rev 5
+# Classification: UNCLASSIFIED
+
+# Dependencies (installed fresh in builder stage)
+node_modules/
+
+# Build output (built fresh in builder stage)
+dist/
+
+# Version control
+.git/
+.github/
+
+# Documentation and planning (not needed in image)
+.plans/
+docs/
+*.md
+
+# Environment and secrets (must never be baked into image)
+.env*
+
+# Development config (not needed in build)
+.nvmrc
+vitest.config.*
+
+# Test coverage artifacts
+coverage/
+
+# IDE
+.vscode/
+.idea/
