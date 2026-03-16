@@ -20,7 +20,7 @@ await build({
   },
   external: [],
   minify: false,
-  sourcemap: true,
+  sourcemap: process.env.SOURCEMAP !== 'false',
 });
 
 console.log('Build complete: dist/index.js');
