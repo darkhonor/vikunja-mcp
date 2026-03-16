@@ -6,12 +6,14 @@
 ###############################################################################
 # Release Pipeline
 #
-# Runs on version tags (v*) to build, generate SBOM, and create a
-# GitHub Release with artifacts attached.
+# Runs on version tags (v*) to build, generate SBOM, create a
+# GitHub Release with artifacts, and publish a container image to GHCR.
 #
 # Security Controls:
-#   - SR-4: Supply chain provenance via CycloneDX SBOM
+#   - SR-4: Supply chain provenance via CycloneDX SBOM + SPDX image attestation
+#   - SA-10: Provenance records source commit, build inputs, and workflow
 #   - SA-11: Build validation before release
+#   - CM-5: GITHUB_TOKEN scoped permissions, no external credentials
 ###############################################################################
 ---
 name: Release
@@ -22,7 +24,9 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: write    # GitHub Release creation
+  packages: write    # GHCR image push
+  id-token: write    # SLSA provenance attestation via OIDC
 
 jobs:
   release:
@@ -64,3 +68,52 @@ jobs:
           files: |
             dist/index.js
             sbom.json
+
+  container:
+    name: Build & Push Container
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup QEMU for multi-arch builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/vikunja-mcp
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
