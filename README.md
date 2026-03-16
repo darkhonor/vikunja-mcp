@@ -180,6 +180,77 @@ npm run build
 npm test          # 81 tests across 5 modules
 ```
 
+## Custom TLS Certificates (NIST SC-8, SC-13)
+
+If your Vikunja instance uses a TLS certificate signed by a **local or private
+Certificate Authority** (e.g., DoD PKI, corporate CA, self-signed root), you
+must provide the CA certificate bundle so Node.js can verify the connection.
+This is **not required** if your server uses a certificate from a publicly
+trusted CA such as Let's Encrypt, DigiCert, or any other provider whose root
+is included in the system trust store.
+
+### Container
+
+Mount your CA certificate bundle into the container and set the
+`NODE_EXTRA_CA_CERTS` environment variable. Add these flags to your
+`docker run` or `podman run` args:
+
+```json
+{
+  "mcpServers": {
+    "vikunja": {
+      "command": "podman",
+      "args": [
+        "run", "--rm", "-i",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--env-file", "/path/to/.env",
+        "-v", "/path/to/token:/run/secrets/vikunja-token:ro",
+        "-v", "/path/to/ca-chain.crt:/etc/ssl/certs/custom-ca.crt:ro",
+        "-e", "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/custom-ca.crt",
+        "ghcr.io/darkhonor/vikunja-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+### Node.js
+
+Set the `NODE_EXTRA_CA_CERTS` environment variable to the path of your CA
+certificate bundle:
+
+```json
+{
+  "mcpServers": {
+    "vikunja": {
+      "command": "node",
+      "args": ["/path/to/vikunja-mcp/dist/index.js"],
+      "env": {
+        "VIKUNJA_URL": "https://vikunja.example.com",
+        "VIKUNJA_API_TOKEN_FILE": "/path/to/vikunja-token",
+        "NODE_EXTRA_CA_CERTS": "/path/to/ca-chain.crt"
+      }
+    }
+  }
+}
+```
+
+### Certificate Bundle Format
+
+The CA bundle file must be PEM-encoded and can contain one or more certificates
+in the chain (root CA, intermediate CAs). Concatenate them in order from leaf
+to root:
+
+```bash
+cat intermediate-ca.crt root-ca.crt > ca-chain.crt
+```
+
+> **Note:** `NODE_EXTRA_CA_CERTS` adds your custom CAs **alongside** the
+> default Node.js trust store — it does not replace it. Public CA certificates
+> will continue to work normally.
+
 ## Tools (16)
 
 ### Projects
