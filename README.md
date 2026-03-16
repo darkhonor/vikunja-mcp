@@ -102,6 +102,117 @@ npm run build
 npm test          # 81 tests across 5 modules
 ```
 
+## Container Deployment
+
+### Build the Image
+
+```bash
+# Podman (recommended for DoD environments — rootless, daemonless)
+podman build --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t vikunja-mcp .
+
+# Docker
+docker build --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t vikunja-mcp .
+```
+
+The multi-stage build runs `npm audit`, type checking, and all 81 unit tests as
+build gates. A failing gate blocks image creation (NIST CM-5, SA-11).
+
+> **Note:** These examples use the local image tag `vikunja-mcp:latest`. If
+> publishing to a registry, substitute with the registry-qualified name
+> (e.g., `darkhonor/vikunja-mcp:latest`).
+
+### Configure Claude Code
+
+Create a `.env` file with non-secret configuration:
+
+```bash
+VIKUNJA_URL=https://vikunja.example.com
+VIKUNJA_LOG_LEVEL=info
+VIKUNJA_RATE_LIMIT=30
+```
+
+Create a token file containing your Vikunja API token:
+
+```bash
+mkdir -p ~/.config/vikunja-mcp
+echo "your-api-token" > ~/.config/vikunja-mcp/token
+chmod 604 ~/.config/vikunja-mcp/token
+```
+
+> **Note:** The token file must be readable by the container user (UID 998).
+> Use `chmod 604` (owner read-write, others read) for local Docker/Podman
+> bind mounts. In Kubernetes, use `fsGroup` in the pod security context to
+> match the file group to the container user.
+
+Add to `~/.claude.json`:
+
+**Podman:**
+
+```json
+{
+  "mcpServers": {
+    "vikunja": {
+      "command": "podman",
+      "args": [
+        "run", "--rm", "-i",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--env-file", "/path/to/.env",
+        "-v", "/path/to/token:/run/secrets/vikunja-token:ro",
+        "vikunja-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+**Docker:**
+
+```json
+{
+  "mcpServers": {
+    "vikunja": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--env-file", "/path/to/.env",
+        "-v", "/path/to/token:/run/secrets/vikunja-token:ro",
+        "vikunja-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+### Runtime Flags
+
+| Flag | Purpose |
+| ---- | ------- |
+| `-i` | Keeps stdin open — required for MCP stdio transport |
+| `--rm` | Auto-remove container when MCP session ends |
+| `--read-only` | Read-only root filesystem — container writes nothing to disk |
+| `--cap-drop=ALL` | Drop all Linux capabilities (DoD Container STIG) |
+| `--security-opt=no-new-privileges` | Prevent privilege escalation via setuid/setgid |
+| `--env-file` | Non-secret configuration (URL, log level, rate limit) |
+| `-v ...:ro` | Mount token file read-only into container |
+
+> **Warning:** Never use `-t` (TTY allocation). TTY escape sequences corrupt
+> the JSON-RPC protocol used by MCP stdio transport.
+
+### Token Authentication (NIST SC-28, IA-5)
+
+The container expects the API token mounted as a file at
+`/run/secrets/vikunja-token`. This path is fixed and not configurable.
+The `.env` file contains only non-secret configuration — the token is
+**never** passed as an environment variable.
+
+Environment variables are visible in process listings (`ps auxe`) and container
+inspect output (`podman inspect`). File-based secrets avoid this exposure.
+
 ## API Notes
 
 This MCP wraps the [Vikunja REST API v1](https://vikunja.io/docs/api/). A few quirks:
