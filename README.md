@@ -104,7 +104,19 @@ npm test          # 81 tests across 5 modules
 
 ## Container Deployment
 
-### Build the Image
+### Pull from GHCR
+
+```bash
+# Pull the latest release
+docker pull ghcr.io/darkhonor/vikunja-mcp:latest
+
+# Or a specific version
+docker pull ghcr.io/darkhonor/vikunja-mcp:1.0.0
+```
+
+Multi-architecture images are available for `linux/amd64` and `linux/arm64`.
+
+### Build Locally
 
 ```bash
 # Podman (recommended for DoD environments — rootless, daemonless)
@@ -116,10 +128,6 @@ docker build --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t vikunja-mc
 
 The multi-stage build runs `npm audit`, type checking, and all 81 unit tests as
 build gates. A failing gate blocks image creation (NIST CM-5, SA-11).
-
-> **Note:** These examples use the local image tag `vikunja-mcp:latest`. If
-> publishing to a registry, substitute with the registry-qualified name
-> (e.g., `darkhonor/vikunja-mcp:latest`).
 
 ### Configure Claude Code
 
@@ -160,7 +168,7 @@ Add to `~/.claude.json`:
         "--security-opt=no-new-privileges",
         "--env-file", "/path/to/.env",
         "-v", "/path/to/token:/run/secrets/vikunja-token:ro",
-        "vikunja-mcp:latest"
+        "ghcr.io/darkhonor/vikunja-mcp:latest"
       ]
     }
   }
@@ -181,7 +189,7 @@ Add to `~/.claude.json`:
         "--security-opt=no-new-privileges",
         "--env-file", "/path/to/.env",
         "-v", "/path/to/token:/run/secrets/vikunja-token:ro",
-        "vikunja-mcp:latest"
+        "ghcr.io/darkhonor/vikunja-mcp:latest"
       ]
     }
   }
