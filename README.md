@@ -1,5 +1,5 @@
 <!-- Filename: README.md -->
-<!-- Last Modified: 2026-03-15 -->
+<!-- Last Modified: 2026-03-16 -->
 <!-- Summary: Hardened MCP server for Vikunja task management -->
 <!-- Compliant With: DoD STIG, NIST SP800-53 Rev 5 -->
 <!-- Classification: UNCLASSIFIED -->
@@ -15,94 +15,7 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io/) server that connects AI assistants to [Vikunja](https://vikunja.io) task management. 16 tools for managing projects, tasks, and labels — hardened for DoD and enterprise deployment.
 
-## Setup
-
-### Environment Variables
-
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `VIKUNJA_URL` | Yes | Your Vikunja instance URL (**HTTPS required**) |
-| `VIKUNJA_API_TOKEN_FILE` | Preferred | Path to file containing API token (Docker/K8s secrets compatible) |
-| `VIKUNJA_API_TOKEN` | Fallback | Direct API token value |
-| `VIKUNJA_LOG_LEVEL` | No | Logging verbosity: `error`, `warn`, `info` (default), `debug` |
-| `VIKUNJA_RATE_LIMIT` | No | Max requests per minute (default: 30) |
-| `NODE_EXTRA_CA_CERTS` | No | Path to custom CA certificate bundle for private PKI |
-
-### Claude Code Configuration
-
-Add to `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "vikunja": {
-      "command": "node",
-      "args": ["/path/to/vikunja-mcp/dist/index.js"],
-      "env": {
-        "VIKUNJA_URL": "https://vikunja.example.com",
-        "VIKUNJA_API_TOKEN_FILE": "/run/secrets/vikunja-token",
-        "NODE_EXTRA_CA_CERTS": "/path/to/ca-chain.crt"
-      }
-    }
-  }
-}
-```
-
-### Docker / Kubernetes Secrets
-
-The preferred credential pattern uses `VIKUNJA_API_TOKEN_FILE` pointing to a
-mounted secret. The server validates file permissions and warns if the token
-file is world-readable.
-
-```yaml
-# Kubernetes example
-env:
-  - name: VIKUNJA_URL
-    value: "https://vikunja.example.com"
-  - name: VIKUNJA_API_TOKEN_FILE
-    value: "/run/secrets/vikunja/token"
-volumeMounts:
-  - name: vikunja-secret
-    mountPath: /run/secrets/vikunja
-    readOnly: true
-```
-
-## Tools (16)
-
-### Projects
-- **vikunja_list_projects** — List all projects
-- **vikunja_create_project** — Create a project (supports nesting via `parent_project_id`)
-- **vikunja_update_project** — Update project title, description, archive status
-- **vikunja_delete_project** — Delete a project and all its tasks
-
-### Tasks
-- **vikunja_list_tasks** — List tasks across all projects (search, filter, sort, paginate)
-- **vikunja_list_project_tasks** — List tasks in a specific project
-- **vikunja_get_task** — Get full task details
-- **vikunja_create_task** — Create a task in a project
-- **vikunja_update_task** — Update task fields
-- **vikunja_complete_task** — Mark a task as done
-- **vikunja_delete_task** — Delete a task
-- **vikunja_bulk_create_tasks** — Create multiple tasks at once (1-50, rate-limited)
-
-### Labels
-- **vikunja_list_labels** — List all labels
-- **vikunja_create_label** — Create a label with optional color
-- **vikunja_add_label_to_task** — Assign a label to a task
-- **vikunja_remove_label_from_task** — Remove a label from a task
-
-## Build from Source
-
-```bash
-git clone https://github.com/darkhonor/vikunja-mcp.git
-cd vikunja-mcp
-nvm use           # Uses .nvmrc (Node 22)
-npm install
-npm run build
-npm test          # 81 tests across 5 modules
-```
-
-## Container Deployment
+## Setup (Container — Recommended)
 
 ### Pull from GHCR
 
@@ -220,6 +133,79 @@ The `.env` file contains only non-secret configuration — the token is
 
 Environment variables are visible in process listings (`ps auxe`) and container
 inspect output (`podman inspect`). File-based secrets avoid this exposure.
+
+## Setup (Node.js — Alternative)
+
+If you prefer to run the MCP server directly without a container:
+
+### Environment Variables
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `VIKUNJA_URL` | Yes | Your Vikunja instance URL (**HTTPS required**) |
+| `VIKUNJA_API_TOKEN_FILE` | Preferred | Path to file containing API token |
+| `VIKUNJA_API_TOKEN` | Fallback | Direct API token value |
+| `VIKUNJA_LOG_LEVEL` | No | Logging verbosity: `error`, `warn`, `info` (default), `debug` |
+| `VIKUNJA_RATE_LIMIT` | No | Max requests per minute (default: 30) |
+| `NODE_EXTRA_CA_CERTS` | No | Path to custom CA certificate bundle for private PKI |
+
+### Claude Code Configuration
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "vikunja": {
+      "command": "node",
+      "args": ["/path/to/vikunja-mcp/dist/index.js"],
+      "env": {
+        "VIKUNJA_URL": "https://vikunja.example.com",
+        "VIKUNJA_API_TOKEN_FILE": "/path/to/vikunja-token",
+        "NODE_EXTRA_CA_CERTS": "/path/to/ca-chain.crt"
+      }
+    }
+  }
+}
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/darkhonor/vikunja-mcp.git
+cd vikunja-mcp
+nvm use           # Uses .nvmrc (Node 22)
+npm install
+npm run build
+npm test          # 81 tests across 5 modules
+```
+
+## Tools (16)
+
+### Projects
+
+- **vikunja_list_projects** — List all projects
+- **vikunja_create_project** — Create a project (supports nesting via `parent_project_id`)
+- **vikunja_update_project** — Update project title, description, archive status
+- **vikunja_delete_project** — Delete a project and all its tasks
+
+### Tasks
+
+- **vikunja_list_tasks** — List tasks across all projects (search, filter, sort, paginate)
+- **vikunja_list_project_tasks** — List tasks in a specific project
+- **vikunja_get_task** — Get full task details
+- **vikunja_create_task** — Create a task in a project
+- **vikunja_update_task** — Update task fields
+- **vikunja_complete_task** — Mark a task as done
+- **vikunja_delete_task** — Delete a task
+- **vikunja_bulk_create_tasks** — Create multiple tasks at once (1-50, rate-limited)
+
+### Labels
+
+- **vikunja_list_labels** — List all labels
+- **vikunja_create_label** — Create a label with optional color
+- **vikunja_add_label_to_task** — Assign a label to a task
+- **vikunja_remove_label_from_task** — Remove a label from a task
 
 ## API Notes
 
